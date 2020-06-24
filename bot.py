@@ -135,7 +135,8 @@ def bot(token):
                         list_of_players.pop(random_index)
                         i += 1
 
-                    send_roles(res)
+                    asyncio.run(send_roles(res))
+
                     return 'Роли выданы'
             else:
                 if need_direct == 1:
@@ -187,7 +188,7 @@ def bot(token):
                         list_of_players.pop(random_index)
                         i += 1
 
-                    send_roles(res)
+                    asyncio.run(send_roles(res))
 
                     return 'Роли выданы'
             else:
@@ -217,6 +218,9 @@ def bot(token):
 
             user = message.author
             if user in users_playing:
+
+                leading_user = user
+
                 return "{} is already in player list!".format(user.mention)
             elif user == leading_user:
                 return "{} is already leading user!".format(leading_user.mention)
@@ -241,6 +245,11 @@ def bot(token):
 
             user = message.author
             if user == leading_user:
+
+
+                leading_user = user
+
+
                 return "{} is leading user, he cannot be player".format(user.mention)
             elif user not in users_playing:
                 users_playing.append(user)
