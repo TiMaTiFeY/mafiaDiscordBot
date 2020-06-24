@@ -187,7 +187,7 @@ def bot(token):
                         list_of_players.pop(random_index)
                         i += 1
 
-                    asyncio.get_event_loop().run_until_complete(send_roles(res))
+                    send_roles(res)
 
                     return 'Роли выданы'
             else:
