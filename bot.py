@@ -247,7 +247,7 @@ def bot(token):
             if user == leading_user:
 
 
-                leading_user = user
+                users_playing.append(user)
 
 
                 return "{} is leading user, he cannot be player".format(user.mention)
