@@ -26,12 +26,14 @@ def bot(token):
                         args.pop(0)
                         if command['args_num'] == 0:
                             answer = str(command['function'](message, self.client, args))
-                            return message.channel.send(answer if answer != 'None' else '')
+                            if answer != 'None':
+                                return message.channel.send(answer)
                             break
                         else:
                             if len(args) >= command['args_num']:
                                 answer = str(command['function'](message, self.client, args))
-                                return message.channel.send(answer if answer != 'None' else '')
+                                if answer != 'None':
+                                    return message.channel.send(answer)
                                 break
                             else:
                                 return message.channel.send('command "{}" requires {} argument(s) "{}"'
@@ -98,7 +100,7 @@ def bot(token):
     async def send_roles(res_dict):
         res_str = ''
         for pair in res_dict.keys():
-            await channel_dict[pair[1]].send("{},ты **{}**".format(pair[1].mention, res_dict[pair].upper()))
+            await channel_dict[pair[1]].send("{} - **{}**".format(pair[1].mention, res_dict[pair].upper()))
             res_str += "{}) {} - **{}**\n".format(pair[0], pair[1].mention, res_dict[pair].upper())
         await channel_dict[leading_user].send(res_str)
 
@@ -133,8 +135,7 @@ def bot(token):
                         list_of_players.pop(random_index)
                         i += 1
 
-                    asyncio.get_event_loop().run_until_complete(send_roles(res))
-
+                    send_roles(res)
                     return 'Роли выданы'
             else:
                 if need_direct == 1:
