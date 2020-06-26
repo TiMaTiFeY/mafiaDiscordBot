@@ -1,16 +1,12 @@
-import asyncio
 import random
 import discord
 
-leading_user = ''
-users_playing = []
-channel_dict = dict()
 
+class Bot:
+    leading_user = ''
+    users_playing = []
 
-def bot(token):
     class CommandHandler:
-
-        # constructor
         def __init__(self, client):
             self.client = client
             self.commands = []
@@ -18,69 +14,71 @@ def bot(token):
         def add_command(self, command):
             self.commands.append(command)
 
-        def command_handler(self, message):
+        def command_handler(self, message, dis_bot):
             for command in self.commands:
-                if message.content.startswith(command['trigger']):
+                if sum([message.content.startswith(cm) for cm in command['trigger']]) > 0:
                     args = message.content.split(' ')
-                    if args[0] == command['trigger']:
+                    if args[0] in command['trigger']:
                         args.pop(0)
                         if command['args_num'] == 0:
-                            answer = str(command['function'](message, self.client, args))
-                            if answer != 'None':
-                                return message.channel.send(answer)
+                            return command['function'](dis_bot, message, self.client, args)
                             break
                         else:
                             if len(args) >= command['args_num']:
-                                answer = str(command['function'](message, self.client, args))
-                                if answer != 'None':
-                                    return message.channel.send(answer)
+                                return command['function'](dis_bot, message, self.client, args)
                                 break
                             else:
-                                return message.channel.send('command "{}" requires {} argument(s) "{}"'
-                                                            .format(command['trigger'], command['args_num'],
-                                                                    ', '.join(command['args_name'])))
+                                return [(message.channel,
+                                         'command "{}" requires {} argument(s) "{}"'.format
+                                         (command['trigger'], command['args_num'], ', '.join(command['args_name'])))]
                                 break
                     else:
                         break
 
-    # create discord client
     discord_client = discord.Client()
-
-    # create the CommandHandler object and pass it the client
     ch = CommandHandler(discord_client)
+    channel_dict = dict()
 
-    def check():
-        need_direct_channel = []
-        if leading_user not in channel_dict.keys():
-            need_direct_channel.append(leading_user)
-        for user in users_playing:
-            if user not in channel_dict.keys():
-                need_direct_channel.append(user)
-        return need_direct_channel
-
-    def commands_command(message, client, args):
+    # -----------------------CommandList--------------------------
+    def commands_command(self, message, client, args):
         try:
             count = 1
-            coms = '**Commands List**\n'
-            for command in ch.commands:
-                coms += '{}) {} : {}\n\n'.format(count, command['trigger'], command['description'])
+            command_list_str = '**Commands List**\n'
+            for command in self.ch.commands:
+                command_list_str += '{}) **{}** :\t {}\n\n'.format(count,
+                                                       ', '.join([cm for cm in command['trigger']]),
+                                                       command['description'])
                 count += 1
-            return coms
+            return Bot.default_channel_message(message, command_list_str)
         except Exception as e:
             print(e)
 
     ch.add_command({
-        'trigger': '!commands',
+        'trigger': ['!commands', '!cm'],
         'function': commands_command,
         'args_num': 0,
         'args_name': [],
         'description': 'Prints a list of all the commands!'
     })
 
-    def get_dict_roles(auto=True, mas=[]):
+    # ------------------------------------------------------------
+
+    @staticmethod
+    def default_channel_message(message, msg):
+        return [(message.channel, msg)]
+
+    def check_users_channels(self):
+        need_direct_channel = []
+        if self.leading_user not in self.channel_dict.keys():
+            need_direct_channel.append(self.leading_user)
+        for user in self.users_playing:
+            if user not in self.channel_dict.keys():
+                need_direct_channel.append(user)
+        return need_direct_channel
+
+    def get_dict_roles(self, auto=True, mas=[]):
         if auto:
-            global users_playing
-            count_players = len(users_playing)
+            count_players = len(self.users_playing)
             if count_players < 6:
                 return None
             elif count_players == 6:
@@ -95,290 +93,370 @@ def bot(token):
             new_mas = list(map(int, mas))
             return {'Мирный': new_mas[0], 'Мафия': new_mas[1], 'Дон': new_mas[2], 'Комиссар': new_mas[3],
                     'Доктор': new_mas[4]}
+
         return None
 
-    async def send_roles(res_dict):
-        res_str = ''
-        for pair in res_dict.keys():
-            await channel_dict[pair[1]].send("{} - **{}**".format(pair[1].mention, res_dict[pair].upper()))
-            res_str += "{}) {} - **{}**\n".format(pair[0], pair[1].mention, res_dict[pair].upper())
-        await channel_dict[leading_user].send(res_str)
+    def create_message_roles(self, dict_roles):
+        list_of_roles = []
 
-    def hanging_roles_auto(message, client, args):
+        for key in dict_roles.keys():
+            for i in range(dict_roles[key]):
+                list_of_roles.append(key)
+
+        users_roles = dict()
+        i = 1
+        while len(list_of_roles) != 0:
+            random_index = random.randint(0, len(list_of_roles) - 1)
+            users_roles[(i, self.users_playing[i - 1])] = list_of_roles[random_index]
+            list_of_roles.pop(random_index)
+            i += 1
+
+        return_list = []
+        leading_msg = ''
+        for (index, user) in users_roles.keys():
+            return_list.append(
+                (self.channel_dict[user], "{} - **{}**".format(user.mention, users_roles[(index, user)].upper()))
+            )
+            leading_msg += "{}) {} - **{}**\n".format(index, user.mention, users_roles[(index, user)].upper())
+        return_list.append(
+            (self.channel_dict[self.leading_user], leading_msg)
+        )
+
+        return return_list
+
+    # --------------------Hanging Roles Auto----------------------
+    def hanging_roles_auto(self, message, client, args):
         try:
-            global leading_user
-            global users_playing
-
-            count = len(users_playing)
+            count = len(self.users_playing)
             if count < 6:
-                return "Минимальное количество игроков: 6\nНе хватает {} игроков".format(6 - count)
-            if leading_user == '':
-                return "Выберите ведущего командой: !leading_me"
+                return Bot.default_channel_message(
+                    message,
+                    "Минимальное количество игроков: 6\nНе хватает {} игроков".format(6 - count)
+                )
+            if self.leading_user == '':
+                return Bot.default_channel_message(message, "Выберите ведущего командой: !leading_me")
 
-            need_direct = check()
+            need_direct = self.check_users_channels()
             if len(need_direct) == 0:
 
-                dict_roles = get_dict_roles()
+                dict_roles = self.get_dict_roles()
 
                 if dict_roles is not None:
-                    list_of_players = []
-
-                    for key in dict_roles.keys():
-                        for i in range(dict_roles[key]):
-                            list_of_players.append(key)
-
-                    res = dict()
-                    i = 1
-                    while len(list_of_players) != 0:
-                        random_index = random.randint(0, len(list_of_players) - 1)
-                        res[(i, users_playing[i - 1])] = list_of_players[random_index]
-                        list_of_players.pop(random_index)
-                        i += 1
-
-                    asyncio.run(send_roles(res))
-
-                    return 'Роли выданы'
+                    msg = self.create_message_roles(dict_roles)
+                    msg.append(
+                        (message.channel, 'Роли выданы')
+                    )
+                    return msg
             else:
                 if need_direct == 1:
-                    return "{}, напиши мне в личные сообщения что-нибудь".format(need_direct[0].mention)
+                    return Bot.default_channel_message(
+                        message,
+                        "{}, напиши мне в личные сообщения что-нибудь".format(need_direct[0].mention)
+                    )
                 else:
-                    return "Эти пользователи должны написать мне в личные сообщения: {}".format(
-                        ', '.join(map(lambda x: x.mention, need_direct))
+                    return Bot.default_channel_message(
+                        message,
+                        "Эти пользователи должны написать мне в личные сообщения: {}".format(
+                            ', '.join(map(lambda x: x.mention, need_direct))
+                        )
                     )
         except Exception as e:
             print(e)
 
     ch.add_command({
-        'trigger': '!start_auto',
+        'trigger': ['!start_auto', '!st_au'],
         'function': hanging_roles_auto,
         'args_num': 0,
         'args_name': [],
         'description': 'Starts auto handing out roles'
     })
 
-    def hanging_roles(message, client, args):
+    # ------------------------------------------------------------
+
+    # --------------------Hanging Roles Not Auto------------------
+    def hanging_roles_not_auto(self, message, client, args):
         try:
-            global leading_user
-            global users_playing
+            count = len(self.users_playing)
+            if self.leading_user == '':
+                return Bot.default_channel_message(message, "Выберите ведущего командой: !leading_me")
 
-            count = len(users_playing)
-            if leading_user == '':
-                return "Выберите ведущего командой: !leading_me"
-            need_direct = check()
-
+            need_direct = self.check_users_channels()
             if len(need_direct) == 0:
-
-                dict_roles = get_dict_roles(auto=False, mas=args)
+                dict_roles = self.get_dict_roles(auto=False, mas=args)
                 if dict_roles is not None:
-                    list_of_players = []
-                    for key in dict_roles.keys():
-                        for i in range(dict_roles[key]):
-                            list_of_players.append(key)
-                    res = dict()
-                    i = 1
-                    if len(list_of_players) < count:
-                        return "Не верно введено кол-во ролей. Не хватает {} ролей игрокам"\
-                            .format(abs(count - len(list_of_players)))
-                    if len(list_of_players) > count:
-                        return "Не верно введено кол-во ролей. Введено на {} ролей больше."\
-                            .format(abs(count - len(list_of_players)))
-                    while len(list_of_players) != 0:
-                        random_index = random.randint(0, len(list_of_players) - 1)
-                        res[(i, users_playing[i - 1])] = list_of_players[random_index]
-                        list_of_players.pop(random_index)
-                        i += 1
+                    list_count = sum(list(map(int, args)))
+                    dif = abs(count - list_count)
+                    s = ''
+                    if list_count < count:
+                        s = "Не верно введено кол-во ролей. Не хватает {} ролей игрокам" \
+                            .format(dif)
+                    if list_count > count:
+                        s = "Не верно введено кол-во ролей. Введено на {} ролей больше." \
+                            .format(dif)
+                    if s != '':
+                        return [(message.channel, s)]
 
-                    asyncio.run(send_roles(res))
-
-                    return 'Роли выданы'
+                    msg = self.create_message_roles(dict_roles)
+                    msg.append(
+                        (message.channel, 'Роли выданы')
+                    )
+                    return msg
             else:
                 if need_direct == 1:
-                    return "{}, напиши мне в личные сообщения что-нибудь".format(need_direct[0].mention)
+                    return Bot.default_channel_message(
+                        message,
+                        "{}, напиши мне в личные сообщения что-нибудь".format(need_direct[0].mention)
+                    )
                 else:
-                    return "Эти пользователи должны написать мне в личные сообщения: {}".format(
-                        ', '.join(map(lambda x: x.mention, need_direct))
+                    return Bot.default_channel_message(
+                        message,
+                        "Эти пользователи должны написать мне в личные сообщения: {}".format(
+                            ', '.join(map(lambda x: x.mention, need_direct))
+                        )
                     )
 
         except Exception as e:
             print(e)
 
     ch.add_command({
-        'trigger': '!start_not_auto',
-        'function': hanging_roles,
+        'trigger': ['!start_not_auto', '!st_n_au'],
+        'function': hanging_roles_not_auto,
         'args_num': 5,
         'args_name': ['<кол-во мирных>', '<кол-во мафии>', '<наличие дона>', '<наличие комиссара>',
                       '<наличие доктора>'],
         'description': 'Starts handing out roles'
     })
 
-    def add_leading_user(message, client, args):
+    # ------------------------------------------------------------
+
+    # --------------------Add leading user------------------------
+    def add_leading_user(self, message, client, args):
         try:
-            global leading_user
-            global users_playing
-
             user = message.author
-            if user in users_playing:
-
-                leading_user = user
-
-                return "{} is already in player list!".format(user.mention)
-            elif user == leading_user:
-                return "{} is already leading user!".format(leading_user.mention)
+            if user in self.users_playing:
+                self.leading_user = user
+                self.users_playing.remove(user)
+                return Bot.default_channel_message(
+                    message, "{} is new leading user, but was removed from player list!".format(user.mention)
+                )
+            elif user == self.leading_user:
+                return Bot.default_channel_message(message,
+                                                   "{} is already leading user!".format(self.leading_user.mention)
+                                                   )
             else:
-                leading_user = user
-                return "{} is new leading user".format(user.mention)
+                self.leading_user = user
+                return Bot.default_channel_message(message, "{} is new leading user".format(user.mention))
         except Exception as e:
             print(e)
 
     ch.add_command({
-        'trigger': '!leading_me',
+        'trigger': ['!leading_me', '!lm'],
         'function': add_leading_user,
         'args_num': 0,
         'args_name': [],
         'description': 'Adds leading user'
     })
 
-    def add_player(message, client, args):
+    # ------------------------------------------------------------
+
+    # --------------------Add player -----------------------------
+    def add_player(self, message, client, args):
         try:
-            global leading_user
-            global users_playing
-
             user = message.author
-            if user == leading_user:
+            if user == self.leading_user:
+                self.users_playing.append(user)
+                self.leading_user = ''
 
-
-                users_playing.append(user)
-
-
-                return "{} is leading user, he cannot be player".format(user.mention)
-            elif user not in users_playing:
-                users_playing.append(user)
-                return "{} has been added to player list".format(user.mention)
+                return Bot.default_channel_message(
+                    message,
+                    "{} has been added to player list, but leading user has cleared".format(user.mention))
+            elif user not in self.users_playing:
+                self.users_playing.append(user)
+                return Bot.default_channel_message(message, "{} has been added to player list".format(user.mention))
             else:
-                return "{} is already added".format(user.mention)
+                return Bot.default_channel_message(message, "{} is already added".format(user.mention))
         except Exception as e:
             print(e)
 
     ch.add_command({
-        'trigger': '!add_me',
+        'trigger': ['!add_me', '!am'],
         'function': add_player,
         'args_num': 0,
         'args_name': [],
         'description': 'Adds author to player list'
     })
 
-    def delete_player(message, client, args):
-        try:
-            global users_playing
+    # ------------------------------------------------------------
 
+    # --------------------Remove player --------------------------
+    def delete_player(self, message, client, args):
+        try:
             user = message.author
-            if user not in users_playing:
-                return "{} is not in the list.".format(user.mention)
+            if user not in self.users_playing:
+                return Bot.default_channel_message(message, "{} is not in the list.".format(user.mention))
             else:
-                users_playing.remove(user)
-                return "{} has been removed from player list".format(user.mention)
+                self.users_playing.remove(user)
+                return Bot.default_channel_message(message, "{} has been removed from player list".format(user.mention))
         except Exception as e:
             print(e)
 
     ch.add_command({
-        'trigger': '!remove_me',
+        'trigger': ['!remove_me', '!rm'],
         'function': delete_player,
         'args_num': 0,
         'args_name': [],
         'description': 'Removes author to player list'
     })
 
-    def print_list_players(message, client, args):
-        try:
-            global users_playing
-            global leading_user
+    # ------------------------------------------------------------
 
-            res = ''
-            res += "Leading user is **{}**\n".format("nobody " if leading_user == '' else leading_user.name)
-            if len(users_playing) == 0:
-                res += "**Players List is empty**"
-                return res
-            users = '**Players List**\n'
-            count = 1
-            for user in users_playing:
-                users += "{}) {}\n".format(count, user.name)
-                count += 1
-            return res + users
+    # --------------------Remove player by index -----------------
+    def delete_player_by_index(self, message, client, args):
+        try:
+            if len(self.users_playing) == 0:
+                return Bot.default_channel_message(message, "**List is empty!**")
+            num = int(args[0])
+            if num < 1 or num > len(self.users_playing):
+                return Bot.default_channel_message(message,
+                                                   "**Wrong num** of player, you can use only 1-{} nums".format(
+                                                       len(self.users_playing)
+                                                   ))
+            user = self.users_playing[num - 1]
+            self.users_playing.remove(user)
+            return Bot.default_channel_message(message, "{} has been removed from player list".format(user.mention))
         except Exception as e:
             print(e)
 
     ch.add_command({
-        'trigger': '!list',
+        'trigger': ['!remove_index', '!ri'],
+        'function': delete_player_by_index,
+        'args_num': 1,
+        'args_name': ['index_player'],
+        'description': 'Removes player by index from list'
+    })
+
+    # ------------------------------------------------------------
+
+    # --------------------Print list players ---------------------
+    def print_list_players(self, message, client, args):
+        try:
+            res = ''
+            res += "Leading user is **{}**\n".format("nobody " if self.leading_user == '' else self.leading_user.name)
+            if len(self.users_playing) == 0:
+                res += "**Players List is empty**"
+                return Bot.default_channel_message(message, res)
+            users = '**Players List**\n'
+            count = 1
+            for user in self.users_playing:
+                users += "{}) {}\n".format(count, user.name)
+                count += 1
+            return Bot.default_channel_message(message, res + users)
+        except Exception as e:
+            print(e)
+
+    ch.add_command({
+        'trigger': ['!list', '!l'],
         'function': print_list_players,
         'args_num': 0,
         'args_name': [],
         'description': 'Prints list of players of current game'
     })
 
-    def clear_list_players(message, client, args):
-        try:
-            global users_playing
-            global leading_user
+    # ------------------------------------------------------------
 
-            users_playing.clear()
-            global leading_user
-            leading_user = ''
-            return "Players List has been cleared"
+    # --------------------Clear list players ---------------------
+    def clear_list_players(self, message, client, args):
+        try:
+            self.users_playing.clear()
+            self.leading_user = ''
+            return Bot.default_channel_message(message, "Players List has been cleared")
         except Exception as e:
             print(e)
 
     ch.add_command({
-        'trigger': '!clear_list',
+        'trigger': ['!clear_list', '!cll'],
         'function': clear_list_players,
         'args_num': 0,
         'args_name': [],
         'description': 'Clears list of players of current game'
     })
 
-    def clear_leading(message, client, args):
+    # ------------------------------------------------------------
+
+    # --------------------Clear leading user ---------------------
+    def clear_leading(self, message, client, args):
         try:
-            global leading_user
-            leading_user = ''
-            return "Leading User has been cleared"
+            self.leading_user = ''
+            return Bot.default_channel_message(message, "Leading User has been cleared")
         except Exception as e:
             print(e)
 
     ch.add_command({
-        'trigger': '!clear_leading',
+        'trigger': ['!clear_leading', '!cllead'],
         'function': clear_leading,
         'args_num': 0,
         'args_name': [],
         'description': 'Clears list of players of current game'
     })
 
-    # bot is ready
-    @discord_client.event
-    async def on_ready():
+    # ------------------------------------------------------------
+
+    # --------------------Shuffle player list---------------------
+    def shuffle_list(self, message, client, args):
         try:
-            print(discord_client.user.name)
-            print(discord_client.user.id)
+            random.shuffle(self.users_playing)
+            return Bot.default_channel_message(message, "Players List has shuffled")
         except Exception as e:
             print(e)
 
-    # on new message
-    @discord_client.event
-    async def on_message(message):
-        # if the message is from the bot itself ignore it
-        if message.author == discord_client.user:
-            pass
-        else:
-            # try to evaluate with the command handler
-            try:
-                if "direct message with" in str(message.channel).lower():
-                    global channel_dict
-                    channel_dict[message.author] = message.channel
-                await ch.command_handler(message)
-            # message doesn't contain a command trigger
-            except TypeError as e:
-                pass
-            # generic python error
-            except Exception as e:
-                print(e)
+    ch.add_command({
+        'trigger': ['!shuffle', '!sh'],
+        'function': shuffle_list,
+        'args_num': 0,
+        'args_name': [],
+        'description': 'Shuffle player list'
+    })
 
-    # start bot
-    discord_client.run(token)
+    # ------------------------------------------------------------
+
+    def start(self, token):
+        self.discord_client.run(token)
+
+
+bot = Bot()
+
+
+@Bot.discord_client.event
+async def on_ready():
+    try:
+        print("BotName={} (userID={})".format(bot.discord_client.user.name, bot.discord_client.user.id))
+    except Exception as e:
+        print(e)
+
+
+# on new message
+@Bot.discord_client.event
+async def on_message(message):
+    # if the message is from the bot itself ignore it
+    if message.author == bot.discord_client.user:
+        pass
+    else:
+        # try to evaluate with the command handler
+        try:
+            if "direct message with" in str(message.channel).lower():
+                bot.channel_dict[message.author] = message.channel
+            answers = Bot.ch.command_handler(message, bot)
+            for channel, msg in answers:
+                if str(msg) != 'None':
+                    print("{}: \"{}\"".format(channel.name, msg))
+                    await channel.send(str(msg))
+        # message doesn't contain a command trigger
+        except TypeError as e:
+            pass
+        # generic python error
+        except Exception as e:
+            print(e)
+
+
+def start(token):
+    bot.discord_client.run(token)
