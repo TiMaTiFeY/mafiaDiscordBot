@@ -448,7 +448,10 @@ async def on_message(message):
             answers = Bot.ch.command_handler(message, bot)
             for channel, msg in answers:
                 if str(msg) != 'None':
-                    print("{}: \"{}\"".format(channel.name, msg))
+                    try:
+                        print("{}: \"{}\"".format(channel.name, msg))
+                    except Exception as e:
+                        print(e)
                     await channel.send(str(msg))
         # message doesn't contain a command trigger
         except TypeError as e:
