@@ -408,7 +408,7 @@ class Bot:
         try:
             res_dict = dict()
             for i, user in enumerate(self.guilds_inf[guild_id].users_playing, 1):
-                res_dict[user] = "0{} {}".format(i, user.name)
+                res_dict[user] = "{:02d} {}".format(i, user.name)
             if self.guilds_inf[guild_id].leading_user != '':
                 res_dict[self.guilds_inf[guild_id].leading_user] = \
                     "Ведущий {}".format(self.guilds_inf[guild_id].leading_user.name)
