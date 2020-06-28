@@ -1,5 +1,12 @@
 import random
 import discord
+from enum import Enum
+
+
+class Event(Enum):
+    SEND = 1
+    RENAME = 2
+
 
 
 class Bot:
@@ -37,9 +44,9 @@ class Bot:
                                 return command['function'](dis_bot, message, guild_id, self.client, args)
                                 break
                             else:
-                                return [(message.channel,
+                                return [(Event.SEND, (message.channel,
                                          'command "{}" requires {} argument(s) "{}"'.format
-                                         (command['trigger'], command['args_num'], ', '.join(command['args_name'])))]
+                                         (command['trigger'], command['args_num'], ', '.join(command['args_name']))))]
                                 break
                     else:
                         break
@@ -74,7 +81,7 @@ class Bot:
 
     @staticmethod
     def default_channel_message(message, msg):
-        return [(message.channel, msg)]
+        return [(Event.SEND, [(message.channel, msg)])]
 
     def get_dict_roles(self, guild_id, auto=True, mas=[]):
         if auto:
@@ -115,11 +122,11 @@ class Bot:
         leading_msg = ''
         for (index, user) in users_roles.keys():
             return_list.append(
-                (user, "{} - **{}**".format(user.mention, users_roles[(index, user)].upper()))
+                (Event.SEND, (user, "{} - **{}**".format(user.mention, users_roles[(index, user)].upper())))
             )
             leading_msg += "{}) {} - **{}**\n".format(index, user.mention, users_roles[(index, user)].upper())
         return_list.append(
-            (self.guilds_inf[guild_id].leading_user, leading_msg)
+            (Event.SEND, (self.guilds_inf[guild_id].leading_user, leading_msg))
         )
 
         return return_list
@@ -144,7 +151,7 @@ class Bot:
                 for role, count in dict_roles.items():
                     if count > 0:
                         text += "**{}**: {};\n".format(role.upper(), count)
-                msg.append((message.channel, text))
+                msg.append((Event.SEND, (message.channel, text)))
                 return msg
         except Exception as e:
             print(e)
@@ -178,14 +185,14 @@ class Bot:
                     s = "Не верно введено кол-во ролей. Введено на {} ролей больше." \
                         .format(dif)
                 if s != '':
-                    return [(message.channel, s)]
+                    return Bot.default_channel_message(message, s)
 
                 msg = self.create_message_roles(dict_roles, guild_id)
                 text = '**Роли выданы:**\n'
                 for role, count in dict_roles.items():
                     if count > 0:
                         text += "**{}**: {};\n".format(role.upper(), count)
-                msg.append((message.channel, text))
+                msg.append((Event.SEND, (message.channel, text)))
                 return msg
 
         except Exception as e:
@@ -239,7 +246,7 @@ class Bot:
             user = message.author
             if user == self.guilds_inf[guild_id].leading_user:
                 self.guilds_inf[guild_id].users_playing.append(user)
-                # self.leading_user = ''
+                self.guilds_inf[guild_id].leading_user = ''
 
                 return Bot.default_channel_message(
                     message,
@@ -396,6 +403,28 @@ class Bot:
 
     # ------------------------------------------------------------
 
+    # --------------------Rename users by game ---------------------
+    def rename_players(self, message, guild_id, client, args):
+        try:
+            res_dict = dict()
+            for i, user in enumerate(self.guilds_inf[guild_id].users_playing, 1):
+                res_dict[user] = "0{} {}".format(i, user.name)
+            if self.guilds_inf[guild_id].leading_user != '':
+                res_dict[self.guilds_inf[guild_id].leading_user] = \
+                    "Ведущий {}".format(self.guilds_inf[guild_id].leading_user.name)
+            return [(Event.RENAME, res_dict), Bot.default_channel_message(message, 'Nicknames was changed')[0]]
+        except Exception as e:
+            print(e)
+
+    ch.add_command({
+        'trigger': ['!rename_all', '!r_all'],
+        'function': rename_players,
+        'args_num': 0,
+        'args_name': [],
+        'description': 'Rename all users by current game'
+    })
+
+    # ------------------------------------------------------------
     def start(self, token):
         self.discord_client.run(token)
 
@@ -423,10 +452,21 @@ async def on_message(message):
         try:
             if message.guild.id not in bot.guilds_inf.keys():
                 bot.guilds_inf[message.guild.id] = bot.GuildInfo()
+
             answers = bot.ch.command_handler(message, bot)
-            for channel, msg in answers:
-                if str(msg) != 'None':
-                    await channel.send(str(msg))
+
+            for event_type, event in answers:
+                if event_type == Event.SEND:
+                    for channel, msg in event:
+                        if str(msg) != 'None':
+                            await channel.send(str(msg))
+                elif event_type == Event.RENAME:
+                    for user, new_name in event.items():
+                        try:
+                            await user.edit(nick=str(new_name))
+                        except Exception as e:
+                            print(e)
+
         # message doesn't contain a command trigger
         except TypeError as e:
             pass
