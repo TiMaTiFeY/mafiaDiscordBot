@@ -82,16 +82,16 @@ class Bot:
             if count_players < 6:
                 return None
             elif count_players == 6:
-                count_roles = {'Мирный': 4, 'Мафия': 0, 'Дон': 1, 'Комиссар': 1, 'Доктор': 0}
+                count_roles = {'Мирный': 4, 'Мафия': 0, 'Дон мафии': 1, 'Комиссар': 1, 'Доктор': 0}
             else:
                 maf = (count_players // 4) + 1
                 wh = count_players - maf
-                count_roles = {'Мирный': wh - 2, 'Мафия': maf - 1, 'Дон': 1, 'Комиссар': 1, 'Доктор': 1}
+                count_roles = {'Мирный': wh - 2, 'Мафия': maf - 1, 'Дон мафии': 1, 'Комиссар': 1, 'Доктор': 1}
             return count_roles
 
         if len(mas) == 5:
             new_mas = list(map(int, mas))
-            return {'Мирный': new_mas[0], 'Мафия': new_mas[1], 'Дон': new_mas[2], 'Комиссар': new_mas[3],
+            return {'Мирный': new_mas[0], 'Мафия': new_mas[1], 'Дон мафии': new_mas[2], 'Комиссар': new_mas[3],
                     'Доктор': new_mas[4]}
 
         return None
@@ -140,9 +140,11 @@ class Bot:
 
             if dict_roles is not None:
                 msg = self.create_message_roles(dict_roles, guild_id)
-                msg.append(
-                    (message.channel, 'Роли выданы')
-                )
+                text = '**Роли выданы:**\n'
+                for role, count in dict_roles.items():
+                    if count > 0:
+                        text += "**{}**: {};\n".format(role.upper(), count)
+                msg.append((message.channel, text))
                 return msg
         except Exception as e:
             print(e)
@@ -179,9 +181,11 @@ class Bot:
                     return [(message.channel, s)]
 
                 msg = self.create_message_roles(dict_roles, guild_id)
-                msg.append(
-                    (message.channel, 'Роли выданы')
-                )
+                text = '**Роли выданы:**\n'
+                for role, count in dict_roles.items():
+                    if count > 0:
+                        text += "**{}**: {};\n".format(role.upper(), count)
+                msg.append((message.channel, text))
                 return msg
 
         except Exception as e:
@@ -191,8 +195,8 @@ class Bot:
         'trigger': ['!start_not_auto', '!st_n_au'],
         'function': hanging_roles_not_auto,
         'args_num': 5,
-        'args_name': ['<кол-во мирных>', '<кол-во мафии>', '<наличие дона>', '<наличие комиссара>',
-                      '<наличие доктора>'],
+        'args_name': ['<кол-во мирных>', '<кол-во мафии>', '<наличие дона мафии 0/1>', '<наличие комиссара 0/1>',
+                      '<наличие доктора 0/1>'],
         'description': 'Starts handing out roles'
     })
 
