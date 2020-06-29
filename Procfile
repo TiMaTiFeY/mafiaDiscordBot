@@ -1,1 +1,1 @@
-bot: python3 main.py
+bot_run: python3 app.py

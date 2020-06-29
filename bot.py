@@ -8,7 +8,6 @@ class Event(Enum):
     RENAME = 2
 
 
-
 class Bot:
     class GuildInfo:
         def __init__(self, leading_user='', users_playing=[]):
@@ -38,16 +37,14 @@ class Bot:
                         guild_id = message.guild.id
                         if command['args_num'] == 0:
                             return command['function'](dis_bot, message, guild_id, self.client, args)
-                            break
                         else:
                             if len(args) >= command['args_num']:
                                 return command['function'](dis_bot, message, guild_id, self.client, args)
-                                break
                             else:
                                 return [(Event.SEND, (message.channel,
-                                         'command "{}" requires {} argument(s) "{}"'.format
-                                         (command['trigger'], command['args_num'], ', '.join(command['args_name']))))]
-                                break
+                                                      'command "{}" requires {} argument(s) "{}"'.format
+                                                      (command['trigger'], command['args_num'],
+                                                       ', '.join(command['args_name']))))]
                     else:
                         break
 
@@ -62,8 +59,8 @@ class Bot:
             command_list_str = '**Commands List**\n'
             for command in self.ch.commands:
                 command_list_str += '{}) **{}** :\t {}\n\n'.format(count,
-                                                       ', '.join([cm for cm in command['trigger']]),
-                                                       command['description'])
+                                                                   ', '.join([cm for cm in command['trigger']]),
+                                                                   command['description'])
                 count += 1
             return Bot.default_channel_message(message, command_list_str)
         except Exception as e:
@@ -126,7 +123,7 @@ class Bot:
             )
             leading_msg += "{}) {} - **{}**\n".format(index, user.mention, users_roles[(index, user)].upper())
         return_list.append(
-            (Event.SEND, (self.guilds_inf[guild_id].leading_user, leading_msg))
+            (self.guilds_inf[guild_id].leading_user, leading_msg)
         )
 
         return return_list
@@ -151,8 +148,8 @@ class Bot:
                 for role, count in dict_roles.items():
                     if count > 0:
                         text += "**{}**: {};\n".format(role.upper(), count)
-                msg.append((Event.SEND, (message.channel, text)))
-                return msg
+                msg.append((message.channel, text))
+                return [(Event.SEND, msg)]
         except Exception as e:
             print(e)
 
@@ -192,8 +189,8 @@ class Bot:
                 for role, count in dict_roles.items():
                     if count > 0:
                         text += "**{}**: {};\n".format(role.upper(), count)
-                msg.append((Event.SEND, (message.channel, text)))
-                return msg
+                msg.append((message.channel, text))
+                return [(Event.SEND, msg)]
 
         except Exception as e:
             print(e)
@@ -436,7 +433,7 @@ bot = Bot()
 async def on_ready():
     try:
         print("BotName={} (userID={})".format(bot.discord_client.user.name, bot.discord_client.user.id))
-        print("Guilds: {}".format(', '.join(list(map(lambda x: '<'+x.name+'>', bot.discord_client.guilds)))))
+        print("Guilds: {}".format(', '.join(list(map(lambda x: '<' + x.name + '>', bot.discord_client.guilds)))))
     except Exception as e:
         print(e)
 
