@@ -78,7 +78,7 @@ class Bot:
 
     @staticmethod
     def default_channel_message(message, msg):
-        return [(Event.SEND, [(message.channel, msg)])]
+        return [(Event.SEND, (message.channel, msg))]
 
     def get_dict_roles(self, guild_id, auto=True, mas=[]):
         if auto:
@@ -123,7 +123,7 @@ class Bot:
             )
             leading_msg += "{}) {} - **{}**\n".format(index, user.mention, users_roles[(index, user)].upper())
         return_list.append(
-            (self.guilds_inf[guild_id].leading_user, leading_msg)
+            (Event.SEND, (self.guilds_inf[guild_id].leading_user, leading_msg))
         )
 
         return return_list
@@ -148,8 +148,8 @@ class Bot:
                 for role, count in dict_roles.items():
                     if count > 0:
                         text += "**{}**: {};\n".format(role.upper(), count)
-                msg.append((message.channel, text))
-                return [(Event.SEND, msg)]
+                msg.append((Event.SEND, (message.channel, text)))
+                return msg
         except Exception as e:
             print(e)
 
@@ -189,8 +189,8 @@ class Bot:
                 for role, count in dict_roles.items():
                     if count > 0:
                         text += "**{}**: {};\n".format(role.upper(), count)
-                msg.append((message.channel, text))
-                return [(Event.SEND, msg)]
+                msg.append((Event.SEND, (message.channel, text)))
+                return msg
 
         except Exception as e:
             print(e)
@@ -409,7 +409,7 @@ class Bot:
             if self.guilds_inf[guild_id].leading_user != '':
                 res_dict[self.guilds_inf[guild_id].leading_user] = \
                     "Ведущий {}".format(self.guilds_inf[guild_id].leading_user.name)
-            return [(Event.RENAME, res_dict), Bot.default_channel_message(message, 'Nicknames was changed')[0]]
+            return [(Event.RENAME, res_dict), (Event.SEND, (message, 'Nicknames was changed'))]
         except Exception as e:
             print(e)
 
@@ -454,9 +454,10 @@ async def on_message(message):
 
             for event_type, event in answers:
                 if event_type == Event.SEND:
-                    for channel, msg in event:
-                        if str(msg) != 'None':
-                            await channel.send(str(msg))
+                    channel = event[0]
+                    msg = event[1]
+                    if str(msg) != 'None':
+                        await channel.send(str(msg))
                 elif event_type == Event.RENAME:
                     for user, new_name in event.items():
                         try:
